@@ -5,11 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>IVS Scaling — Real Data vs Reference Standards</title>
 
-  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-  <!-- React + Recharts via CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
@@ -75,7 +73,6 @@ const {
   Tooltip, Legend, ReferenceLine, ResponsiveContainer
 } = Recharts;
 
-// ── Color palette ────────────────────────────────────────────────────────────
 const C = {
   male:    "#58a6ff",
   female:  "#ff7b72",
@@ -88,11 +85,6 @@ const C = {
   text:    "#e6edf3",
 };
 
-// ── Shared BSA grid + all reference lines merged into one dataset ────────────
-// Single array means tooltip cursor always finds a point in every active series.
-// Shiwani is only defined for BSA ≥ 1.07; values outside that range are null.
-
-// Shiwani lookup table (interpolate between known points)
 const SHIWANI_RAW = [
   { bsa:1.07, mUln:11.9, fUln:10.5, mMean:9.0,  fMean:7.7  },
   { bsa:1.14, mUln:11.9, fUln:10.5, mMean:9.0,  fMean:7.7  },
@@ -134,15 +126,11 @@ function shiwaniInterp(bsa) {
   };
 }
 
-// MESA IVS/BSA coefficients (mm/m²)
-// Mean:  Male 6.1, Female 6.0  (M > F)
-// ULN:   Male 8.3, Female 8.6  (F > M — SD flips the relationship!)
 const MESA_COEFF = {
   meanMale: 6.1,   meanFemale: 6.0,
   ulnMale:  8.3,   ulnFemale:  8.6,
 };
 
-// Build unified grid: 80 points, BSA 0.10 → 2.80
 const REF_DATA = Array.from({ length: 80 }, (_, i) => {
   const bsa = +(0.10 + (i / 79) * 2.70).toFixed(3);
   const s = shiwaniInterp(bsa);
@@ -156,7 +144,6 @@ const REF_DATA = Array.from({ length: 80 }, (_, i) => {
   };
 });
 
-// ── Toggle button component ───────────────────────────────────────────────────
 function ToggleBtn({ label, on, onClick, colorKey, lineStyle = "dot" }) {
   const colors = {
     male:    C.male,    female: C.female,
@@ -201,7 +188,6 @@ function ToggleBtn({ label, on, onClick, colorKey, lineStyle = "dot" }) {
   );
 }
 
-// ── Custom tooltip ────────────────────────────────────────────────────────────
 function CustomTooltip({ active, payload, show }) {
   if (!active || !payload || payload.length === 0) return null;
 
@@ -213,21 +199,16 @@ function CustomTooltip({ active, payload, show }) {
   );
 
   const rows = [
-    // MESA means (dimmed, shown first to set up M>F)
     show?.mesaMean && { label: "MESA ♂ Mean",   value: ref.mesaMeanMale,   color: C.mesa, dim: true },
     show?.mesaMean && { label: "MESA ♀ Mean",   value: ref.mesaMeanFemale, color: C.mesa, dim: true },
-    // MESA ULN (full opacity — F>M flip revealed)
     show?.mesaMale   && { label: "MESA ♂ ULN",    value: ref.mesaMale,   color: C.mesa    },
     show?.mesaFemale && { label: "MESA ♀ ULN",    value: ref.mesaFemale, color: C.mesa    },
-    // Shiwani means (dimmed, same treatment as MESA)
     show?.shiwaniMean      && ref.mMean != null && { label: "Shiwani ♂ Mean", value: ref.mMean, color: C.shiwani, dim: true },
     show?.shiwaniMean      && ref.fMean != null && { label: "Shiwani ♀ Mean", value: ref.fMean, color: C.shiwani, dim: true },
-    // Shiwani ULN (full opacity)
     show?.shiwaniMaleUln   && ref.mUln != null && { label: "Shiwani ♂ ULN", value: ref.mUln, color: C.shiwani },
     show?.shiwaniFemaleUln && ref.fUln != null && { label: "Shiwani ♀ ULN", value: ref.fUln, color: C.shiwani },
   ].filter(Boolean);
 
-  // Group rows into MESA and Shiwani sections for visual separation
   const mesaRows = rows.filter(r => r.label.startsWith('MESA'));
   const shiwaniRows = rows.filter(r => r.label.startsWith('Shiwani'));
 
@@ -260,7 +241,6 @@ function CustomTooltip({ active, payload, show }) {
   );
 }
 
-// ── Main App ─────────────────────────────────────────────────────────────────
 function App({ data }) {
   const [show, setShow] = useState({
     male:              true,
@@ -273,6 +253,9 @@ function App({ data }) {
     shiwaniMean:       false,
     hcm:               true,
   });
+
+  // Tooltip toggle — on by default, easy to kill for demo
+  const [tooltipEnabled, setTooltipEnabled] = useState(true);
 
   const toggle = key => setShow(s => ({ ...s, [key]: !s[key] }));
 
@@ -291,27 +274,58 @@ function App({ data }) {
 
   const meta = data.meta || {};
 
+  // Demo mode toggle button styles
+  const demoOff = tooltipEnabled;
+  const demoBtnStyle = {
+    display: "inline-flex", alignItems: "center", gap: 8,
+    padding: "6px 16px", borderRadius: 20,
+    border: `1.5px solid ${demoOff ? C.border : C.shiwani}`,
+    cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: 12, fontWeight: 600,
+    background: demoOff ? "transparent" : `${C.shiwani}18`,
+    color: demoOff ? C.muted : C.shiwani,
+    transition: "all 0.2s ease",
+    letterSpacing: "0.3px",
+  };
+
   return (
     <div>
       {/* ── Header ── */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{
-          fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 500,
-          letterSpacing: "1.2px", textTransform: "uppercase",
-          color: C.shiwani, marginBottom: 8
-        }}>
-          Indexing in the Precision Medicine Era
+      <div style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{
+            fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 500,
+            letterSpacing: "1.2px", textTransform: "uppercase",
+            color: C.shiwani, marginBottom: 8
+          }}>
+            Indexing in the Precision Medicine Era
+          </div>
+          <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.4px", lineHeight: 1.3 }}>
+            IVS Thickness — Data vs Adult Reference Standards
+          </h1>
+          <p style={{
+            fontSize: 12, color: C.muted, marginTop: 6,
+            fontFamily: "'DM Mono', monospace", lineHeight: 1.7
+          }}>
+            N={meta.n_male + meta.n_female} subjects (♂ {meta.n_male} · ♀ {meta.n_female}) ·
+            real PHN BSA values · IVS sampled via Z ~ N(0,1) · α=0.40 · mean=5.8mm · SD=0.9mm
+          </p>
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.4px", lineHeight: 1.3 }}>
-          IVS Thickness — Data vs Adult Reference Standards
-        </h1>
-        <p style={{
-          fontSize: 12, color: C.muted, marginTop: 6,
-          fontFamily: "'DM Mono', monospace", lineHeight: 1.7
-        }}>
-          N={meta.n_male + meta.n_female} subjects (♂ {meta.n_male} · ♀ {meta.n_female}) ·
-          real PHN BSA values · IVS sampled via Z ~ N(0,1) · α=0.40 · mean=5.8mm · SD=0.9mm
-        </p>
+
+        {/* ── Demo Mode Toggle ── */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, paddingTop: 4 }}>
+          <button style={demoBtnStyle} onClick={() => setTooltipEnabled(v => !v)}>
+            <span style={{ fontSize: 14 }}>{tooltipEnabled ? "🖱️" : "🎤"}</span>
+            {tooltipEnabled ? "Tooltips ON" : "Demo Mode"}
+          </button>
+          <div style={{
+            fontSize: 10, fontFamily: "'DM Mono', monospace",
+            color: C.muted, textAlign: "right"
+          }}>
+            {tooltipEnabled ? "click to hide for presenting" : "tooltips hidden — hover freely"}
+          </div>
+        </div>
       </div>
 
       {/* ── Controls ── */}
@@ -320,7 +334,6 @@ function App({ data }) {
         borderRadius: 12, padding: "18px 22px", marginBottom: 14,
         display: "flex", flexWrap: "wrap", gap: 24, alignItems: "flex-start"
       }}>
-        {/* PHN Scatter */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontSize: 9.5, fontWeight: 600, textTransform: "uppercase",
             letterSpacing: "1px", color: C.muted, fontFamily: "'DM Mono', monospace" }}>
@@ -332,7 +345,6 @@ function App({ data }) {
           </div>
         </div>
 
-        {/* MESA */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontSize: 9.5, fontWeight: 600, textTransform: "uppercase",
             letterSpacing: "1px", color: C.muted, fontFamily: "'DM Mono', monospace" }}>
@@ -345,7 +357,6 @@ function App({ data }) {
           </div>
         </div>
 
-        {/* Shiwani */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontSize: 9.5, fontWeight: 600, textTransform: "uppercase",
             letterSpacing: "1px", color: C.muted, fontFamily: "'DM Mono', monospace" }}>
@@ -358,7 +369,6 @@ function App({ data }) {
           </div>
         </div>
 
-        {/* HCM */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontSize: 9.5, fontWeight: 600, textTransform: "uppercase",
             letterSpacing: "1px", color: C.muted, fontFamily: "'DM Mono', monospace" }}>
@@ -392,91 +402,86 @@ function App({ data }) {
                        style: { fontSize: 12, fill: C.muted } }}
               stroke={C.border} tick={{ fill: C.muted, fontSize: 11, fontFamily: "'DM Mono', monospace" }}
             />
-            <Tooltip content={<CustomTooltip show={show} />} />
 
-            {/* HCM threshold */}
+            {/* Tooltip is conditionally active */}
+            <Tooltip
+              content={tooltipEnabled ? <CustomTooltip show={show} /> : () => null}
+              cursor={tooltipEnabled ? { stroke: C.border, strokeWidth: 1 } : false}
+            />
+
             {show.hcm && (
               <ReferenceLine y={15} stroke={C.hcm} strokeDasharray="6 3" strokeWidth={1.5}
                 label={{ value: "HCM ≥15mm", position: "insideTopLeft",
                          style: { fill: C.hcm, fontSize: 11, fontFamily: "'DM Mono', monospace" } }} />
             )}
 
-            {/* PHN Male — rendered as dots via Line with no stroke */}
             {show.male && (
               <Line
                 data={males} dataKey="ivs" name="PHN Male"
                 stroke="none" strokeWidth={0}
                 dot={{ r: 3, fill: `${C.male}88`, strokeWidth: 0 }}
-                activeDot={{ r: 4, fill: C.male, strokeWidth: 0 }}
+                activeDot={false}
                 isAnimationActive={false}
                 legendType="circle"
               />
             )}
 
-            {/* PHN Female — rendered as dots via Line with no stroke */}
             {show.female && (
               <Line
                 data={females} dataKey="ivs" name="PHN Female"
                 stroke="none" strokeWidth={0}
                 dot={{ r: 3, fill: `${C.female}88`, strokeWidth: 0 }}
-                activeDot={{ r: 4, fill: C.female, strokeWidth: 0 }}
+                activeDot={false}
                 isAnimationActive={false}
                 legendType="circle"
               />
             )}
 
-            {/* MESA Mean Male — thin solid, dimmed */}
             {show.mesaMean && (
               <Line data={REF_DATA} dataKey="mesaMeanMale" name="MESA ♂ Mean"
                 stroke={C.mesa} strokeWidth={1.5} strokeOpacity={0.5}
-                dot={false} activeDot={{ r: 0, strokeWidth: 0 }} isAnimationActive={false} />
+                dot={false} activeDot={false} isAnimationActive={false} />
             )}
 
-            {/* MESA Mean Female — thin dashed, dimmed */}
             {show.mesaMean && (
               <Line data={REF_DATA} dataKey="mesaMeanFemale" name="MESA ♀ Mean"
                 stroke={C.mesa} strokeWidth={1.5} strokeDasharray="6 4" strokeOpacity={0.5}
-                dot={false} activeDot={{ r: 0, strokeWidth: 0 }} isAnimationActive={false} />
+                dot={false} activeDot={false} isAnimationActive={false} />
             )}
 
-            {/* MESA Male ULN — solid */}
             {show.mesaMale && (
               <Line data={REF_DATA} dataKey="mesaMale" name="MESA ♂ ULN"
                 stroke={C.mesa} strokeWidth={2}
-                dot={false} activeDot={{ r: 0, strokeWidth: 0 }} isAnimationActive={false} />
+                dot={false} activeDot={false} isAnimationActive={false} />
             )}
 
-            {/* MESA Female ULN — dashed */}
             {show.mesaFemale && (
               <Line data={REF_DATA} dataKey="mesaFemale" name="MESA ♀ ULN"
                 stroke={C.mesa} strokeWidth={2} strokeDasharray="6 4"
-                dot={false} activeDot={{ r: 0, strokeWidth: 0 }} isAnimationActive={false} />
+                dot={false} activeDot={false} isAnimationActive={false} />
             )}
 
-            {/* Shiwani Male ULN — solid */}
             {show.shiwaniMaleUln && (
               <Line data={REF_DATA} dataKey="mUln" name="Shiwani ♂ ULN"
                 stroke={C.shiwani} strokeWidth={2.5} connectNulls={false}
-                dot={false} activeDot={{ r: 0, strokeWidth: 0 }} isAnimationActive={false} />
+                dot={false} activeDot={false} isAnimationActive={false} />
             )}
 
-            {/* Shiwani Female ULN — dashed */}
             {show.shiwaniFemaleUln && (
               <Line data={REF_DATA} dataKey="fUln" name="Shiwani ♀ ULN"
                 stroke={C.shiwani} strokeWidth={2.5} strokeDasharray="6 4" connectNulls={false}
-                dot={false} activeDot={{ r: 0, strokeWidth: 0 }} isAnimationActive={false} />
+                dot={false} activeDot={false} isAnimationActive={false} />
             )}
 
-            {/* Shiwani Mean lines */}
             {show.shiwaniMean && (
               <Line data={REF_DATA} dataKey="mMean" name="Shiwani ♂ Mean"
                 stroke={C.shiwani} strokeWidth={1.5} strokeOpacity={0.55} connectNulls={false}
-                dot={false} activeDot={{ r: 0, strokeWidth: 0 }} isAnimationActive={false} />
+                dot={false} activeDot={false} isAnimationActive={false} />
             )}
             {show.shiwaniMean && (
               <Line data={REF_DATA} dataKey="fMean" name="Shiwani ♀ Mean"
                 stroke={C.shiwani} strokeWidth={1.5} strokeDasharray="6 4" strokeOpacity={0.55} connectNulls={false}
-                dot={false} activeDot={{ r: 0, strokeWidth: 0 }} isAnimationActive={false} />
+                dot={false} activeDot={false} isAnimationActive={false} />
             )}
 
           </ComposedChart>
@@ -645,7 +650,7 @@ function App({ data }) {
             display: "flex", alignItems: "center", gap: 5,
           }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill={C.muted}>
-            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+            <path d="M20.447 20.452h-3.554v-5.569c0-1.628-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
           </svg>
           LinkedIn
         </a>
@@ -654,7 +659,6 @@ function App({ data }) {
   );
 }
 
-// ── Bootstrap ────────────────────────────────────────────────────────────────
 fetch("phn_ivs_data.json")
   .then(r => r.json())
   .then(data => {
